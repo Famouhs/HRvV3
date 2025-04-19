@@ -1,0 +1,15 @@
+{
+    "accuracy": 0.842,
+    "roc_auc": 0.879,
+    "precision": 0.361,
+    "recall": 0.188,
+    "top_features": [
+        {"feature": "barrel_pct", "importance": 0.184},
+        {"feature": "avg_exit_velocity", "importance": 0.142},
+        {"feature": "hr_rate", "importance": 0.119},
+        {"feature": "pitcher_hr_per_9", "importance": 0.096},
+        {"feature": "matchup_score", "importance": 0.088},
+        {"feature": "weather_boost", "importance": 0.072},
+        {"feature": "park_hr_factor", "importance": 0.068}
+    ]
+}
