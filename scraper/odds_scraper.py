@@ -2,44 +2,38 @@ import requests
 import pandas as pd
 from bs4 import BeautifulSoup
 
-def get_hr_odds():
+def get_odds_data():
     """
-    Scrapes MLB home run odds from OddsJam or similar free sportsbook data.
-    Returns a DataFrame with Player, Team, and HR odds.
+    Scrapes home run prop odds from a free source like OddsJam or other sportsbook comparison sites.
+    Returns a DataFrame with player names and home run odds.
     """
-    url = "https://www.oddsjam.com/odds/player-props/mlb/home-run"
-
+    url = "https://www.oddschecker.com/baseball/mlb/player/home-runs"
+    
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
 
-    try:
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.content, "html.parser")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load odds page: {e}")
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch odds data: Status code {response.status_code}")
 
-    players = []
-    odds = []
+    soup = BeautifulSoup(response.content, "html.parser")
 
-    for prop in soup.select("div[class*=PlayerPropsRow]"):
-        name_elem = prop.select_one("a[href*='/players/']")
-        odds_elem = prop.select_one("div[class*=best-offer]")
+    # This parsing depends on the site structure, update selectors as needed
+    odds_data = []
+    markets = soup.find_all("div", class_="matchup-odds")
 
-        if name_elem and odds_elem:
-            player = name_elem.text.strip()
-            odd = odds_elem.text.strip()
+    for market in markets:
+        player_tag = market.find("span", class_="player-name")
+        odds_tag = market.find("span", class_="odds")
 
-            if "HR" in player.upper():
-                continue  # filter out misparsed names
+        if player_tag and odds_tag:
+            player_name = player_tag.text.strip()
+            odds = odds_tag.text.strip()
+            odds_data.append({
+                "Player": player_name,
+                "HR_Odds": odds
+            })
 
-            players.append(player)
-            odds.append(odd)
-
-    df = pd.DataFrame({
-        "Player": players,
-        "HR_Odds": odds
-    })
-
-    return df
-# TODO: Implement scraper
+    odds_df = pd.DataFrame(odds_data)
+    return odds_df
