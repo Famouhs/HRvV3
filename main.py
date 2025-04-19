@@ -1,50 +1,58 @@
+import os
+import sys
 import streamlit as st
 import pandas as pd
-import altair as alt
-from mlb_hr_model import load_model, get_today_predictions
+from datetime import datetime
+
+# Ensure local modules are importable
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from scraper.player_stats import get_player_stats
-from scraper.odds_scraper import get_hr_odds
+from scraper.odds_scraper import get_odds_data
+from model.predictor import predict_home_runs
+from visuals.charts import plot_top_predictions
 
-st.set_page_config(page_title="MLB HR AI Predictor", layout="wide")
+# --- App Title ---
+st.set_page_config(page_title="MLB Home Run Predictor", layout="wide")
+st.title("⚾ MLB Home Run AI Predictor")
 
-# Load model
-model = load_model("models/hr_model.pkl")
-
-# Manual refresh button
-if st.button("🔄 Refresh Player Data & Odds"):
+# --- Refresh Button ---
+if st.button("🔄 Refresh Data"):
     st.experimental_rerun()
 
-# Get real player stats and odds
-stats_df = get_player_stats()
-odds_df = get_hr_odds()
-merged_df = pd.merge(stats_df, odds_df, on="Player", how="inner")
+# --- Load and Process Data ---
+try:
+    st.info("Loading player statistics...")
+    player_stats = get_player_stats()
 
-# Fill mock feature values (in real use, replace with engineered features)
-merged_df["barrel_pct"] = 0.12
-merged_df["avg_exit_velocity"] = 91.4
-merged_df["hr_rate"] = merged_df["HR"] / merged_df["G"]
-merged_df["pitcher_hr_per_9"] = 1.1
-merged_df["matchup_score"] = 1.0
-merged_df["weather_boost"] = 1.0
-merged_df["park_hr_factor"] = 1.0
+    st.info("Fetching odds data...")
+    odds_data = get_odds_data()
 
-# Predict
-results = get_today_predictions(model, merged_df)
+    st.success("Data loaded successfully!")
 
-# Streamlit UI
-st.title("⚾ MLB Home Run Prediction AI")
-st.markdown("### 📊 Predicted Home Run Probabilities")
-st.dataframe(results[["Player", "Team", "HR Odds", "HR Probability", "AI Rating"]])
+    # --- Merge and Predict ---
+    st.info("Generating home run predictions...")
+    predictions = predict_home_runs(player_stats, odds_data)
 
-# Bar chart
-chart = alt.Chart(results).mark_bar().encode(
-    x=alt.X('HR Probability', scale=alt.Scale(domain=[0, 1])),
-    y=alt.Y('Player', sort='-x'),
-    color=alt.Color('AI Rating', scale=alt.Scale(scheme='goldgreen'))
-).properties(width=700, height=400, title="AI-Predicted HR Probability")
+    if predictions.empty:
+        st.warning("No projections available at this time.")
+    else:
+        # --- Display Results ---
+        st.subheader("🔍 Top HR Predictions Today")
+        st.dataframe(predictions, use_container_width=True)
 
-st.altair_chart(chart, use_container_width=True)
+        # --- Visual Chart ---
+        st.subheader("📊 Home Run Prediction Chart")
+        fig = plot_top_predictions(predictions)
+        st.plotly_chart(fig, use_container_width=True)
 
-# CSV download
-csv = results.to_csv(index=False).encode('utf-8')
-st.download_button("📥 Download Projections as CSV", data=csv, file_name="hr_predictions.csv", mime="text/csv")
+        # --- Download Button ---
+        csv_data = predictions.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Download Projections as CSV",
+            data=csv_data,
+            file_name=f"hr_projections_{datetime.now().strftime('%Y-%m-%d')}.csv",
+            mime="text/csv"
+        )
+except Exception as e:
+    st.error(f"An error occurred: {e}")
